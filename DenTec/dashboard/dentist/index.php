@@ -18,6 +18,29 @@ function executeQuery($conn, $query) {
     return $result;
 }
 
+// Function to update appointment status based on completed treatments
+function updateAppointmentStatusFromTreatments($conn, $dentist_id) {
+    // Update appointment status based on completed treatments
+    $update_query = "
+        UPDATE appointments a
+        SET a.status = 'Completed'
+        WHERE a.dentist_id = $dentist_id
+        AND a.status = 'Scheduled'
+        AND EXISTS (
+            SELECT 1 FROM treatment_records tr 
+            WHERE tr.patient_id = a.patient_id 
+            AND DATE(tr.treatment_date) = a.scheduled_date 
+            AND tr.dentist_id = a.dentist_id
+            AND tr.status = 'Completed'
+        )
+    ";
+    
+    return executeQuery($conn, $update_query);
+}
+
+// Update appointment statuses before fetching data
+updateAppointmentStatusFromTreatments($conn, $dentist_id);
+
 // Get analytics data for this dentist only
 $patients_result = executeQuery($conn, "SELECT COUNT(DISTINCT a.patient_id) AS total 
                                         FROM appointments a
@@ -45,14 +68,24 @@ $this_week_appointments = executeQuery($conn, "SELECT COUNT(*) AS total
                                               WHERE dentist_id = $dentist_id 
                                               AND YEARWEEK(scheduled_date, 1) = YEARWEEK(CURDATE(), 1)");
 
-// Get upcoming appointments for this dentist
+// Get upcoming appointments for this dentist with real-time status check
 $upcoming_appointments = executeQuery($conn, "
     SELECT 
+        a.appointment_id,
         a.scheduled_date, 
         a.start_time, 
         a.end_time,
         CONCAT(p.first_name, ' ', p.last_name) AS patient_name, 
-        a.status,
+        CASE 
+            WHEN EXISTS (
+                SELECT 1 FROM treatment_records tr 
+                WHERE tr.patient_id = a.patient_id 
+                AND DATE(tr.treatment_date) = a.scheduled_date 
+                AND tr.dentist_id = a.dentist_id
+                AND tr.status = 'Completed'
+            ) THEN 'Completed'
+            ELSE a.status
+        END AS status,
         p.patient_id,
         a.reason
     FROM appointments a
@@ -60,7 +93,7 @@ $upcoming_appointments = executeQuery($conn, "
     WHERE a.dentist_id = $dentist_id
     AND a.scheduled_date >= CURDATE()
     ORDER BY a.scheduled_date ASC, a.start_time ASC
-    LIMIT 5
+    LIMIT 10
 ");
 
 // Get recent treatments performed by this dentist
@@ -262,6 +295,12 @@ $this_week_appts = $this_week_appointments ? $this_week_appointments->fetch_asso
       background-color: var(--primary-color);
       color: white;
     }
+
+    .alert-info {
+      background-color: #e3f2fd;
+      border-color: #2196f3;
+      color: #1976d2;
+    }
     
     /* Responsive adjustments */
     @media (max-width: 992px) {
@@ -338,6 +377,12 @@ $this_week_appts = $this_week_appointments ? $this_week_appointments->fetch_asso
         </div>
       </div>
 
+      <!-- Status Update Alert -->
+      <div class="alert alert-info mb-4" role="alert">
+        <i class="bi bi-info-circle me-2"></i>
+        <strong>Status Update:</strong> Appointment statuses are now automatically synchronized with completed treatments for accurate reporting.
+      </div>
+
       <!-- Stats Cards -->
       <div class="row g-4 mb-4">
         <div class="col-md-6 col-lg-3">
@@ -385,11 +430,14 @@ $this_week_appts = $this_week_appointments ? $this_week_appointments->fetch_asso
         </div>
       </div>
 
-      <!-- Upcoming Appointments -->
+      <!-- Today's Appointments and Recent Treatments -->
       <div class="row g-4 mb-4">
         <div class="col-lg-6">
           <div class="table-container">
-            <h5 class="mb-4">Today's Appointments</h5>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+              <h5 class="mb-0">Today's Appointments</h5>
+              <small class="text-muted">Status auto-updated</small>
+            </div>
             <div class="table-responsive">
               <table class="table table-hover align-middle">
                 <thead class="table-light">
@@ -443,14 +491,20 @@ $this_week_appts = $this_week_appointments ? $this_week_appointments->fetch_asso
                     if (!$shown_today):
                   ?>
                     <tr>
-                      <td colspan="4" class="text-center text-muted py-4">No appointments scheduled for today</td>
+                      <td colspan="4" class="text-center text-muted py-4">
+                        <i class="bi bi-calendar-x fs-2 d-block mb-2"></i>
+                        No appointments scheduled for today
+                      </td>
                     </tr>
                   <?php 
                     endif;
                   else: 
                   ?>
                     <tr>
-                      <td colspan="4" class="text-center text-muted py-4">No appointments scheduled for today</td>
+                      <td colspan="4" class="text-center text-muted py-4">
+                        <i class="bi bi-calendar-x fs-2 d-block mb-2"></i>
+                        No appointments scheduled for today
+                      </td>
                     </tr>
                   <?php endif; ?>
                 </tbody>
@@ -490,7 +544,10 @@ $this_week_appts = $this_week_appointments ? $this_week_appointments->fetch_asso
                     <?php endwhile; ?>
                   <?php else: ?>
                     <tr>
-                      <td colspan="4" class="text-center text-muted py-4">No recent treatments found</td>
+                      <td colspan="4" class="text-center text-muted py-4">
+                        <i class="bi bi-clipboard-x fs-2 d-block mb-2"></i>
+                        No recent treatments found
+                      </td>
                     </tr>
                   <?php endif; ?>
                 </tbody>
@@ -500,8 +557,8 @@ $this_week_appts = $this_week_appointments ? $this_week_appointments->fetch_asso
         </div>
       </div>
 
-      <!-- Common Treatments and Upcoming Appointments -->
-      <div class="row">
+      <!-- Common Treatments -->
+      <div class="row mb-4">
         <div class="col-12">
           <div class="table-container">
             <h5 class="mb-4">Your Most Common Treatments</h5>
@@ -539,7 +596,10 @@ $this_week_appts = $this_week_appointments ? $this_week_appointments->fetch_asso
                     <?php endwhile; ?>
                   <?php else: ?>
                     <tr>
-                      <td colspan="3" class="text-center text-muted py-4">No treatment data available</td>
+                      <td colspan="3" class="text-center text-muted py-4">
+                        <i class="bi bi-bar-chart fs-2 d-block mb-2"></i>
+                        No treatment data available
+                      </td>
                     </tr>
                   <?php endif; ?>
                 </tbody>
@@ -553,7 +613,10 @@ $this_week_appts = $this_week_appointments ? $this_week_appointments->fetch_asso
       <div class="row">
         <div class="col-12">
           <div class="table-container">
-            <h5 class="mb-4">Upcoming Appointments</h5>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+              <h5 class="mb-0">Upcoming Appointments</h5>
+              <small class="text-muted">Auto-refreshed status</small>
+            </div>
             <div class="table-responsive">
               <table class="table table-hover align-middle">
                 <thead class="table-light">
@@ -595,7 +658,7 @@ $this_week_appts = $this_week_appointments ? $this_week_appointments->fetch_asso
                           $date = new DateTime($row['scheduled_date']);
                           $tomorrow = new DateTime('tomorrow');
                           if ($date->format('Y-m-d') === $tomorrow->format('Y-m-d')) {
-                              echo '<span class="text-primary">Tomorrow</span>';
+                              echo '<span class="text-primary fw-bold">Tomorrow</span>';
                           } else {
                               echo date('D, M j', strtotime($row['scheduled_date']));
                           }
@@ -624,14 +687,20 @@ $this_week_appts = $this_week_appointments ? $this_week_appointments->fetch_asso
                     if (!$shown_future):
                   ?>
                     <tr>
-                      <td colspan="5" class="text-center text-muted py-4">No upcoming appointments</td>
+                      <td colspan="5" class="text-center text-muted py-4">
+                        <i class="bi bi-calendar-plus fs-2 d-block mb-2"></i>
+                        No upcoming appointments
+                      </td>
                     </tr>
                   <?php 
                     endif;
                   else: 
                   ?>
                     <tr>
-                      <td colspan="5" class="text-center text-muted py-4">No upcoming appointments</td>
+                      <td colspan="5" class="text-center text-muted py-4">
+                        <i class="bi bi-calendar-plus fs-2 d-block mb-2"></i>
+                        No upcoming appointments
+                      </td>
                     </tr>
                   <?php endif; ?>
                 </tbody>
@@ -655,6 +724,18 @@ $this_week_appts = $this_week_appointments ? $this_week_appointments->fetch_asso
       setTimeout(updateClock, 1000);
     }
     updateClock();
+
+    // Auto-refresh page every 5 minutes to keep status updated
+    setTimeout(() => {
+      location.reload();
+    }, 300000); // 5 minutes
+
+    // Add confirmation for logout
+    document.querySelector('a[href="../../logout.php"]').addEventListener('click', function(e) {
+      if (!confirm('Are you sure you want to logout?')) {
+        e.preventDefault();
+      }
+    });
   </script>
 </body>
 </html>
