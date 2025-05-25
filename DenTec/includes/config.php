@@ -1,8 +1,8 @@
 <?php
-$host = $_ENV['MYSQLHOST'] ?? 'localhost';
+$host = $_ENV['MYSQLHOST'] ?? 'mysql.railway.internal';
 $user = $_ENV['MYSQLUSER'] ?? 'root';
-$pass = $_ENV['MYSQLPASSWORD'] ?? '';
-$dbname = $_ENV['MYSQLDATABASE'] ?? 'dental_management';
+$pass = $_ENV['MYSQLPASSWORD'] ?? 'tpUIlkAzENJxUIPmnBvHXQumimrQyysD';
+$dbname = $_ENV['MYSQLDATABASE'] ?? 'railway';
 
 $conn = new mysqli($host, $user, $pass, $dbname);
 
