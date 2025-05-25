@@ -1,8 +1,8 @@
 <?php
-$host = 'localhost';
-$user = 'root';
-$pass = '';
-$dbname = 'dental_management';
+$host = $_ENV['MYSQLHOST'] ?? 'localhost';
+$user = $_ENV['MYSQLUSER'] ?? 'root';
+$pass = $_ENV['MYSQLPASSWORD'] ?? '';
+$dbname = $_ENV['MYSQLDATABASE'] ?? 'dental_management';
 
 $conn = new mysqli($host, $user, $pass, $dbname);
 
