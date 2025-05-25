@@ -11,12 +11,12 @@ return [
     'openweathermap_api_key' => 'b981ecc940ea5dbc5bd5a1be1772a981', // Replace with your actual API key
     
     // Database Configuration (Optional - if you prefer to keep it here instead of db_connect.php)
-    'database' => [
-        'host' => 'localhost',
-        'username' => 'roor',
-        'password' => '',
-        'name' => 'ddental_management'
-    ],
+'database' => [
+    'host' => $_ENV['MYSQLHOST'] ?? 'localhost',
+    'username' => $_ENV['MYSQLUSER'] ?? 'root',
+    'password' => $_ENV['MYSQLPASSWORD'] ?? '',
+    'name' => $_ENV['MYSQLDATABASE'] ?? 'ddental_management'
+],
     
     // Application Settings
     'site_name' => 'DenTec Clinic Management',
