@@ -76,8 +76,7 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
             p.file_number LIKE '%$search_term%' OR 
             p.first_name LIKE '%$search_term%' OR 
             p.last_name LIKE '%$search_term%' OR
-            p.phone LIKE '%$search_term%' OR
-            p.email LIKE '%$search_term%'
+            p.phone LIKE '%$search_term%'
         ORDER BY p.created_at DESC
         LIMIT 50
     ");
