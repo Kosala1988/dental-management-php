@@ -22,7 +22,7 @@ return [
     'site_name' => 'DenTec Clinic Management',
     'admin_email' => 'admin@dentec.com',
     'timezone' => 'Asia/Colombo',
-    'debug_mode' => false,
+    'debug_mode' => true,
     
     // Session Settings
     'session' => [
